@@ -649,8 +649,8 @@ useEffect(() => {
          */
         const existingUser = users.find(
           (user) =>
-            user.email.toLowerCase() ===
-            data.user.email.toLowerCase()
+            String(user.email || '').trim().toLowerCase() ===
+            String(data.user.email || '').trim().toLowerCase()
         );
 
         const loggedInUser: User = {
