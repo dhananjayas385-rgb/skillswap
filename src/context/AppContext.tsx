@@ -313,6 +313,34 @@ export const AppProvider: React.FC<{
     };
   };
 
+  const loadRealUsers = async () => {
+  const token = localStorage.getItem('skillswap_token');
+
+  if (!token) return;
+
+  try {
+    const response = await apiRequest('/users/');
+
+    const realUsers = (response.users || []).map((item: any) => ({
+      id: item.id,
+      email: item.email || '',
+      name: item.full_name || item.profile?.full_name || 'Student',
+      fullName: item.full_name || item.profile?.full_name || 'Student',
+      ...item.profile,
+    }));
+
+    setUsers(realUsers);
+  } catch (error) {
+    console.error('Failed to load real users:', error);
+  }
+};
+
+useEffect(() => {
+  if (currentUser) {
+    loadRealUsers();
+  }
+}, [currentUser]);
+
   /*
    * ---------------------------------------------------------
    * LOCAL STORAGE SYNC

@@ -7,6 +7,7 @@ from routes.skills import router as skills_router
 from routes.user_skills import router as user_skills_router
 from routes.exchange_requests import router as exchange_requests_router
 from routes.app_state import router as app_state_router
+from routes.users import router as users_router
 
 
 app = FastAPI(
@@ -50,3 +51,4 @@ app.include_router(skills_router)
 app.include_router(user_skills_router)
 app.include_router(exchange_requests_router)
 app.include_router(app_state_router)
+app.include_router(users_router)
