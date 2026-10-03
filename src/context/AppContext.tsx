@@ -1,4 +1,11 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useRef,
+} from 'react';
+
 import {
   User,
   SkillOffer,
@@ -11,8 +18,8 @@ import {
   Session,
   ScreenId,
   FilterState,
-  SkillCategory,
 } from '../types';
+
 import {
   initialUsers,
   initialSkillOffers,
@@ -24,6 +31,8 @@ import {
   initialReviews,
   initialSessions,
 } from '../data/seedData';
+
+import { apiRequest } from '../utils/api';
 
 const DEFAULT_FILTERS: FilterState = {
   searchQuery: '',
@@ -46,28 +55,52 @@ interface AppContextType {
   notifications: NotificationItem[];
   reviews: Review[];
   sessions: Session[];
+
   currentScreen: ScreenId;
   screenParams: any;
   historyStack: { screen: ScreenId; params?: any }[];
+
   filters: FilterState;
   onboardingCompleted: boolean;
   mobileFrameMode: boolean;
-  toastMessage: { text: string; type: 'success' | 'error' | 'info' } | null;
 
-  // Actions
+  toastMessage: {
+    text: string;
+    type: 'success' | 'error' | 'info';
+  } | null;
+
   navigate: (screen: ScreenId, params?: any) => void;
   goBack: () => void;
-  showToast: (text: string, type?: 'success' | 'error' | 'info') => void;
+
+  showToast: (
+    text: string,
+    type?: 'success' | 'error' | 'info'
+  ) => void;
+
   login: (email: string, pass: string) => boolean;
   signup: (userData: Partial<User>) => void;
   logout: () => void;
+
   completeOnboarding: () => void;
   updateProfile: (data: Partial<User>) => void;
-  addSkillOffer: (offer: Omit<SkillOffer, 'id' | 'userId'>) => void;
-  editSkillOffer: (id: string, offer: Partial<SkillOffer>) => void;
+
+  addSkillOffer: (
+    offer: Omit<SkillOffer, 'id' | 'userId'>
+  ) => void;
+
+  editSkillOffer: (
+    id: string,
+    offer: Partial<SkillOffer>
+  ) => void;
+
   deleteSkillOffer: (id: string) => void;
-  addSkillWant: (want: Omit<SkillWant, 'id' | 'userId'>) => void;
+
+  addSkillWant: (
+    want: Omit<SkillWant, 'id' | 'userId'>
+  ) => void;
+
   deleteSkillWant: (id: string) => void;
+
   sendExchangeRequest: (reqData: {
     receiverId: string;
     skillOfferedId: string;
@@ -75,81 +108,228 @@ interface AppContextType {
     message: string;
     preferredSchedule: string;
   }) => void;
+
   acceptExchangeRequest: (requestId: string) => void;
   rejectExchangeRequest: (requestId: string) => void;
   cancelExchangeRequest: (requestId: string) => void;
+
   sendMessage: (exchangeId: string, text: string) => void;
+
   markSessionCompleted: (sessionId: string) => void;
   endExchange: (exchangeId: string) => void;
-  submitReview: (reviewData: { exchangeId: string; revieweeId: string; rating: number; comment: string }) => void;
+
+  submitReview: (reviewData: {
+    exchangeId: string;
+    revieweeId: string;
+    rating: number;
+    comment: string;
+  }) => void;
+
   markNotificationRead: (id: string) => void;
   markAllNotificationsRead: () => void;
+
   updateFilters: (newFilters: Partial<FilterState>) => void;
   resetFilters: () => void;
+
   toggleMobileFrame: () => void;
   resetToDemoState: () => void;
 }
 
-const AppContext = createContext<AppContextType | undefined>(undefined);
+const AppContext = createContext<AppContextType | undefined>(
+  undefined
+);
 
 const LOCAL_STORAGE_KEY = 'skillswap_app_state_v1';
 
-export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // Load initial state from LocalStorage or seedData
+export const AppProvider: React.FC<{
+  children: React.ReactNode;
+}> = ({ children }) => {
+  /*
+   * ---------------------------------------------------------
+   * LOCAL STORAGE
+   * ---------------------------------------------------------
+   */
+
   const getSavedState = () => {
     try {
       const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
-      if (saved) return JSON.parse(saved);
-    } catch (e) {
-      console.error('Failed to load state from localStorage', e);
+
+      if (saved) {
+        return JSON.parse(saved);
+      }
+    } catch (error) {
+      console.error(
+        'Failed to load state from localStorage:',
+        error
+      );
     }
+
     return null;
   };
 
   const saved = getSavedState();
 
-  const [users, setUsers] = useState<User[]>(saved?.users || initialUsers);
-  const [currentUser, setCurrentUser] = useState<User | null>(
-    saved?.currentUser || initialUsers[0]
+  /*
+   * ---------------------------------------------------------
+   * STATE
+   * ---------------------------------------------------------
+   */
+
+  const [users, setUsers] = useState<User[]>(
+    saved?.users || initialUsers
   );
-  const [skillOffers, setSkillOffers] = useState<SkillOffer[]>(saved?.skillOffers || initialSkillOffers);
-  const [skillWants, setSkillWants] = useState<SkillWant[]>(saved?.skillWants || initialSkillWants);
-  const [requests, setRequests] = useState<ExchangeRequest[]>(saved?.requests || initialRequests);
-  const [exchanges, setExchanges] = useState<Exchange[]>(saved?.exchanges || initialExchanges);
-  const [messages, setMessages] = useState<Message[]>(saved?.messages || initialMessages);
-  const [notifications, setNotifications] = useState<NotificationItem[]>(saved?.notifications || initialNotifications);
-  const [reviews, setReviews] = useState<Review[]>(saved?.reviews || initialReviews);
-  const [sessions, setSessions] = useState<Session[]>(saved?.sessions || initialSessions);
-  const [onboardingCompleted, setOnboardingCompleted] = useState<boolean>(saved?.onboardingCompleted ?? true);
 
-  const [currentScreen, setCurrentScreen] = useState<ScreenId>('HOME');
-  const [screenParams, setScreenParams] = useState<any>(null);
-  const [historyStack, setHistoryStack] = useState<{ screen: ScreenId; params?: any }[]>([{ screen: 'HOME' }]);
-  const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS);
-  const [mobileFrameMode, setMobileFrameMode] = useState<boolean>(false);
-  const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'error' | 'info' } | null>(null);
+  const [currentUser, setCurrentUser] =
+    useState<User | null>(
+      saved?.currentUser || initialUsers[0]
+    );
 
-  // Sync state to LocalStorage
+  const [skillOffers, setSkillOffers] =
+    useState<SkillOffer[]>(
+      saved?.skillOffers || initialSkillOffers
+    );
+
+  const [skillWants, setSkillWants] =
+    useState<SkillWant[]>(
+      saved?.skillWants || initialSkillWants
+    );
+
+  const [requests, setRequests] =
+    useState<ExchangeRequest[]>(
+      saved?.requests || initialRequests
+    );
+
+  const [exchanges, setExchanges] =
+    useState<Exchange[]>(
+      saved?.exchanges || initialExchanges
+    );
+
+  const [messages, setMessages] =
+    useState<Message[]>(
+      saved?.messages || initialMessages
+    );
+
+  const [notifications, setNotifications] =
+    useState<NotificationItem[]>(
+      saved?.notifications || initialNotifications
+    );
+
+  const [reviews, setReviews] =
+    useState<Review[]>(
+      saved?.reviews || initialReviews
+    );
+
+  const [sessions, setSessions] =
+    useState<Session[]>(
+      saved?.sessions || initialSessions
+    );
+
+  const [onboardingCompleted, setOnboardingCompleted] =
+    useState<boolean>(
+      saved?.onboardingCompleted ?? true
+    );
+
+  const [currentScreen, setCurrentScreen] =
+    useState<ScreenId>('HOME');
+
+  const [screenParams, setScreenParams] =
+    useState<any>(null);
+
+  const [historyStack, setHistoryStack] =
+    useState<
+      { screen: ScreenId; params?: any }[]
+    >([{ screen: 'HOME' }]);
+
+  const [filters, setFilters] =
+    useState<FilterState>(DEFAULT_FILTERS);
+
+  const [mobileFrameMode, setMobileFrameMode] =
+    useState<boolean>(false);
+
+  const [toastMessage, setToastMessage] =
+    useState<{
+      text: string;
+      type: 'success' | 'error' | 'info';
+    } | null>(null);
+
+  /*
+   * This prevents the first LocalStorage state from
+   * immediately overwriting the Supabase state.
+   */
+  const serverStateLoaded = useRef(false);
+
+  /*
+   * Prevent multiple simultaneous saves.
+   */
+  const saveTimeout = useRef<ReturnType<
+    typeof setTimeout
+  > | null>(null);
+
+  /*
+   * ---------------------------------------------------------
+   * CREATE COMPLETE APP STATE
+   * ---------------------------------------------------------
+   */
+
+  const buildAppState = () => {
+    return {
+      users,
+      currentUser,
+      skillOffers,
+      skillWants,
+      requests,
+      exchanges,
+      messages,
+      notifications,
+      reviews,
+      sessions,
+      onboardingCompleted,
+    };
+  };
+
+  /*
+   * ---------------------------------------------------------
+   * REMOVE PASSWORDS BEFORE SENDING STATE TO BACKEND
+   * ---------------------------------------------------------
+   */
+
+  const sanitizeStateForBackend = () => {
+    const state = buildAppState();
+
+    return {
+      ...state,
+
+      users: state.users.map((user) => ({
+        ...user,
+        password: '',
+      })),
+
+      currentUser: state.currentUser
+        ? {
+            ...state.currentUser,
+            password: '',
+          }
+        : null,
+    };
+  };
+
+  /*
+   * ---------------------------------------------------------
+   * LOCAL STORAGE SYNC
+   * ---------------------------------------------------------
+   */
+
   useEffect(() => {
     try {
       localStorage.setItem(
         LOCAL_STORAGE_KEY,
-        JSON.stringify({
-          users,
-          currentUser,
-          skillOffers,
-          skillWants,
-          requests,
-          exchanges,
-          messages,
-          notifications,
-          reviews,
-          sessions,
-          onboardingCompleted,
-        })
+        JSON.stringify(buildAppState())
       );
-    } catch (e) {
-      console.error('Failed to save to localStorage', e);
+    } catch (error) {
+      console.error(
+        'Failed to save state to localStorage:',
+        error
+      );
     }
   }, [
     users,
@@ -165,13 +345,219 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     onboardingCompleted,
   ]);
 
-  const showToast = (text: string, type: 'success' | 'error' | 'info' = 'success') => {
-    setToastMessage({ text, type });
-    setTimeout(() => setToastMessage(null), 3000);
+  /*
+   * ---------------------------------------------------------
+   * LOAD STATE FROM SUPABASE
+   * ---------------------------------------------------------
+   */
+
+  const loadBackendState = async () => {
+    const token =
+      localStorage.getItem('skillswap_token');
+
+    if (!token) {
+      serverStateLoaded.current = true;
+      return;
+    }
+
+    try {
+      const data = await apiRequest('/app-state/');
+
+      if (data?.state) {
+        const state = data.state;
+
+        if (Array.isArray(state.users)) {
+          setUsers(state.users);
+        }
+
+        if (state.currentUser) {
+          setCurrentUser(state.currentUser);
+        }
+
+        if (Array.isArray(state.skillOffers)) {
+          setSkillOffers(state.skillOffers);
+        }
+
+        if (Array.isArray(state.skillWants)) {
+          setSkillWants(state.skillWants);
+        }
+
+        if (Array.isArray(state.requests)) {
+          setRequests(state.requests);
+        }
+
+        if (Array.isArray(state.exchanges)) {
+          setExchanges(state.exchanges);
+        }
+
+        if (Array.isArray(state.messages)) {
+          setMessages(state.messages);
+        }
+
+        if (Array.isArray(state.notifications)) {
+          setNotifications(state.notifications);
+        }
+
+        if (Array.isArray(state.reviews)) {
+          setReviews(state.reviews);
+        }
+
+        if (Array.isArray(state.sessions)) {
+          setSessions(state.sessions);
+        }
+
+        if (
+          typeof state.onboardingCompleted ===
+          'boolean'
+        ) {
+          setOnboardingCompleted(
+            state.onboardingCompleted
+          );
+        }
+
+        console.log(
+          'SkillSwap data loaded from Supabase'
+        );
+      } else {
+        /*
+         * No backend state exists yet.
+         * Save the existing local state for this user.
+         */
+        serverStateLoaded.current = true;
+
+        await apiRequest('/app-state/', {
+          method: 'PUT',
+          body: JSON.stringify({
+            state: sanitizeStateForBackend(),
+          }),
+        });
+
+        console.log(
+          'Initial SkillSwap state uploaded to Supabase'
+        );
+
+        return;
+      }
+
+      serverStateLoaded.current = true;
+    } catch (error) {
+      console.error(
+        'Could not load SkillSwap state from backend:',
+        error
+      );
+
+      /*
+       * LocalStorage remains the fallback.
+       */
+      serverStateLoaded.current = true;
+    }
   };
 
-  const navigate = (screen: ScreenId, params?: any) => {
-    setHistoryStack((prev) => [...prev, { screen, params }]);
+  /*
+   * Load backend state once when AppContext starts.
+   */
+
+  useEffect(() => {
+    void loadBackendState();
+  }, []);
+
+  /*
+   * ---------------------------------------------------------
+   * SAVE STATE TO SUPABASE
+   * ---------------------------------------------------------
+   */
+
+  useEffect(() => {
+    const token =
+      localStorage.getItem('skillswap_token');
+
+    if (!token) return;
+
+    if (!serverStateLoaded.current) return;
+
+    if (saveTimeout.current) {
+      clearTimeout(saveTimeout.current);
+    }
+
+    saveTimeout.current = setTimeout(() => {
+      void (async () => {
+        try {
+          await apiRequest('/app-state/', {
+            method: 'PUT',
+            body: JSON.stringify({
+              state: sanitizeStateForBackend(),
+            }),
+          });
+
+          console.log(
+            'SkillSwap state synchronized with Supabase'
+          );
+        } catch (error) {
+          console.error(
+            'Failed to synchronize state with backend:',
+            error
+          );
+        }
+      })();
+    }, 700);
+
+    return () => {
+      if (saveTimeout.current) {
+        clearTimeout(saveTimeout.current);
+      }
+    };
+  }, [
+    users,
+    currentUser,
+    skillOffers,
+    skillWants,
+    requests,
+    exchanges,
+    messages,
+    notifications,
+    reviews,
+    sessions,
+    onboardingCompleted,
+  ]);
+
+  /*
+   * ---------------------------------------------------------
+   * TOAST
+   * ---------------------------------------------------------
+   */
+
+  const showToast = (
+    text: string,
+    type: 'success' | 'error' | 'info' = 'success'
+  ) => {
+    setToastMessage({
+      text,
+      type,
+    });
+
+    setTimeout(() => {
+      setToastMessage(null);
+    }, 3000);
+  };
+
+  /*
+   * ---------------------------------------------------------
+   * NAVIGATION
+   * ---------------------------------------------------------
+   */
+
+  const navigate = (
+    screen: ScreenId,
+    params?: any
+  ) => {
+    setHistoryStack((prev) => [
+      ...prev,
+      {
+        screen,
+        params,
+      },
+    ]);
+
     setCurrentScreen(screen);
     setScreenParams(params || null);
   };
@@ -179,317 +565,1100 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const goBack = () => {
     if (historyStack.length > 1) {
       const newStack = [...historyStack];
+
       newStack.pop();
-      const previous = newStack[newStack.length - 1];
+
+      const previous =
+        newStack[newStack.length - 1];
+
       setHistoryStack(newStack);
+
       setCurrentScreen(previous.screen);
-      setScreenParams(previous.params || null);
+
+      setScreenParams(
+        previous.params || null
+      );
     } else {
       setCurrentScreen('HOME');
       setScreenParams(null);
     }
   };
 
-  const login = (email: string, pass: string): boolean => {
-    const user = users.find((u) => u.email.toLowerCase() === email.toLowerCase());
-    if (user && (user.password === pass || pass === 'password123')) {
-      setCurrentUser(user);
-      showToast(`Welcome back, ${user.name}! 👋`);
-      navigate('HOME');
-      return true;
-    }
-    return false;
+  /*
+   * ---------------------------------------------------------
+   * LOGIN
+   * ---------------------------------------------------------
+   */
+
+  const login = (
+    email: string,
+    pass: string
+  ): boolean => {
+    void (async () => {
+      try {
+        const data = await apiRequest(
+          '/auth/login',
+          {
+            method: 'POST',
+            body: JSON.stringify({
+              email,
+              password: pass,
+            }),
+          }
+        );
+
+        /*
+         * Save JWT.
+         */
+        localStorage.setItem(
+          'skillswap_token',
+          data.access_token
+        );
+
+        /*
+         * Find existing profile information
+         * if it already exists in our local/backend state.
+         */
+        const existingUser = users.find(
+          (user) =>
+            user.email.toLowerCase() ===
+            data.user.email.toLowerCase()
+        );
+
+        const loggedInUser: User = {
+          id: data.user.id,
+
+          name:
+            data.user.full_name ||
+            existingUser?.name ||
+            'Student',
+
+          email: data.user.email,
+
+          password: '',
+
+          avatar:
+            existingUser?.avatar || '',
+
+          college:
+            existingUser?.college || '',
+
+          department:
+            existingUser?.department || '',
+
+          semester:
+            existingUser?.semester || '',
+
+          bio:
+            existingUser?.bio || '',
+
+          rating:
+            existingUser?.rating ?? 5,
+
+          reviewCount:
+            existingUser?.reviewCount ?? 0,
+
+          completedExchanges:
+            existingUser?.completedExchanges ?? 0,
+
+          availability:
+            existingUser?.availability ||
+            'Flexible',
+
+          interests:
+            existingUser?.interests || [],
+
+          createdAt:
+            existingUser?.createdAt ||
+            new Date().toISOString(),
+        };
+
+        /*
+         * Make sure the user exists in local app state.
+         */
+        setUsers((prev) => {
+          const exists = prev.some(
+            (user) => user.id === loggedInUser.id
+          );
+
+          if (exists) {
+            return prev.map((user) =>
+              user.id === loggedInUser.id
+                ? {
+                    ...user,
+                    ...loggedInUser,
+                  }
+                : user
+            );
+          }
+
+          return [
+            loggedInUser,
+            ...prev,
+          ];
+        });
+
+        setCurrentUser(loggedInUser);
+
+        /*
+         * Load the user's saved cloud state.
+         */
+        serverStateLoaded.current = false;
+
+        try {
+          const stateData =
+            await apiRequest('/app-state/');
+
+          if (stateData?.state) {
+            const state =
+              stateData.state;
+
+            if (Array.isArray(state.users)) {
+              setUsers(state.users);
+            }
+
+            if (state.currentUser) {
+              setCurrentUser(
+                state.currentUser
+              );
+            }
+
+            if (
+              Array.isArray(
+                state.skillOffers
+              )
+            ) {
+              setSkillOffers(
+                state.skillOffers
+              );
+            }
+
+            if (
+              Array.isArray(
+                state.skillWants
+              )
+            ) {
+              setSkillWants(
+                state.skillWants
+              );
+            }
+
+            if (
+              Array.isArray(
+                state.requests
+              )
+            ) {
+              setRequests(
+                state.requests
+              );
+            }
+
+            if (
+              Array.isArray(
+                state.exchanges
+              )
+            ) {
+              setExchanges(
+                state.exchanges
+              );
+            }
+
+            if (
+              Array.isArray(
+                state.messages
+              )
+            ) {
+              setMessages(
+                state.messages
+              );
+            }
+
+            if (
+              Array.isArray(
+                state.notifications
+              )
+            ) {
+              setNotifications(
+                state.notifications
+              );
+            }
+
+            if (
+              Array.isArray(
+                state.reviews
+              )
+            ) {
+              setReviews(
+                state.reviews
+              );
+            }
+
+            if (
+              Array.isArray(
+                state.sessions
+              )
+            ) {
+              setSessions(
+                state.sessions
+              );
+            }
+
+            if (
+              typeof state.onboardingCompleted ===
+              'boolean'
+            ) {
+              setOnboardingCompleted(
+                state.onboardingCompleted
+              );
+            }
+          }
+        } catch (stateError) {
+          console.error(
+            'Could not load cloud state after login:',
+            stateError
+          );
+        }
+
+        serverStateLoaded.current = true;
+
+        showToast(
+          `Welcome back, ${
+            loggedInUser.name
+          }! 👋`
+        );
+
+        navigate('HOME');
+      } catch (error) {
+        console.error(
+          'Login failed:',
+          error
+        );
+
+        showToast(
+          error instanceof Error
+            ? error.message
+            : 'Invalid email or password',
+          'error'
+        );
+      }
+    })();
+
+    /*
+     * Keep the original synchronous API
+     * expected by your Login screen.
+     */
+    return true;
   };
 
-  const signup = (userData: Partial<User>) => {
-    const newUser: User = {
-      id: `user-${Date.now()}`,
-      name: userData.name || 'New Student',
-      email: userData.email || '',
-      password: userData.password || 'password123',
-      avatar:
-        userData.avatar ||
-        'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=300',
-      college: userData.college || 'RV College of Engineering',
-      department: userData.department || 'Computer Science',
-      semester: userData.semester || '1st Sem',
-      bio: '',
-      rating: 5.0,
-      reviewCount: 0,
-      completedExchanges: 0,
-      availability: 'Flexible',
-      interests: [],
-      createdAt: new Date().toISOString(),
-    };
-    setUsers((prev) => [newUser, ...prev]);
-    setCurrentUser(newUser);
-    showToast('Account created successfully!');
-    navigate('PROFILE_SETUP');
+  /*
+   * ---------------------------------------------------------
+   * SIGNUP
+   * ---------------------------------------------------------
+   */
+
+  const signup = (
+    userData: Partial<User>
+  ) => {
+    void (async () => {
+      try {
+        /*
+         * Register user in backend.
+         */
+        await apiRequest(
+          '/auth/register',
+          {
+            method: 'POST',
+            body: JSON.stringify({
+              email:
+                userData.email || '',
+              password:
+                userData.password ||
+                'password123',
+              full_name:
+                userData.name ||
+                'New Student',
+            }),
+          }
+        );
+
+        /*
+         * Immediately login after registration.
+         * Backend registration currently returns
+         * the created user but not a JWT.
+         */
+        const loginData =
+          await apiRequest(
+            '/auth/login',
+            {
+              method: 'POST',
+              body: JSON.stringify({
+                email:
+                  userData.email || '',
+                password:
+                  userData.password ||
+                  'password123',
+              }),
+            }
+          );
+
+        localStorage.setItem(
+          'skillswap_token',
+          loginData.access_token
+        );
+
+        const newUser: User = {
+          id: loginData.user.id,
+
+          name:
+            loginData.user.full_name ||
+            userData.name ||
+            'New Student',
+
+          email:
+            loginData.user.email ||
+            userData.email ||
+            '',
+
+          password: '',
+
+          avatar:
+            userData.avatar ||
+            'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=300',
+
+          college:
+            userData.college ||
+            'RV College of Engineering',
+
+          department:
+            userData.department ||
+            'Computer Science',
+
+          semester:
+            userData.semester ||
+            '1st Sem',
+
+          bio: userData.bio || '',
+
+          rating: 5,
+
+          reviewCount: 0,
+
+          completedExchanges: 0,
+
+          availability:
+            userData.availability ||
+            'Flexible',
+
+          interests:
+            userData.interests || [],
+
+          createdAt:
+            new Date().toISOString(),
+        };
+
+        setUsers((prev) => [
+          newUser,
+          ...prev,
+        ]);
+
+        setCurrentUser(newUser);
+
+        setOnboardingCompleted(true);
+
+        serverStateLoaded.current = true;
+
+        showToast(
+          'Account created successfully!'
+        );
+
+        navigate(
+          'PROFILE_SETUP'
+        );
+      } catch (error) {
+        console.error(
+          'Signup failed:',
+          error
+        );
+
+        showToast(
+          error instanceof Error
+            ? error.message
+            : 'Could not create account',
+          'error'
+        );
+      }
+    })();
   };
+
+  /*
+   * ---------------------------------------------------------
+   * LOGOUT
+   * ---------------------------------------------------------
+   */
 
   const logout = () => {
+    localStorage.removeItem(
+      'skillswap_token'
+    );
+
+    serverStateLoaded.current =
+      false;
+
     setCurrentUser(null);
-    showToast('Logged out successfully', 'info');
+
+    showToast(
+      'Logged out successfully',
+      'info'
+    );
+
     navigate('LOGIN');
   };
+
+  /*
+   * ---------------------------------------------------------
+   * ONBOARDING
+   * ---------------------------------------------------------
+   */
 
   const completeOnboarding = () => {
     setOnboardingCompleted(true);
+
     navigate('LOGIN');
   };
 
-  const updateProfile = (data: Partial<User>) => {
+  /*
+   * ---------------------------------------------------------
+   * PROFILE
+   * ---------------------------------------------------------
+   */
+
+  const updateProfile = (
+    data: Partial<User>
+  ) => {
     if (!currentUser) return;
-    const updated = { ...currentUser, ...data };
+
+    const updated: User = {
+      ...currentUser,
+      ...data,
+      password: '',
+    };
+
     setCurrentUser(updated);
-    setUsers((prev) => prev.map((u) => (u.id === currentUser.id ? updated : u)));
-    showToast('Profile updated!');
+
+    setUsers((prev) =>
+      prev.map((user) =>
+        user.id === currentUser.id
+          ? updated
+          : user
+      )
+    );
+
+    showToast(
+      'Profile updated!'
+    );
   };
 
-  const addSkillOffer = (offer: Omit<SkillOffer, 'id' | 'userId'>) => {
+  /*
+   * ---------------------------------------------------------
+   * SKILL OFFERS
+   * ---------------------------------------------------------
+   */
+
+  const addSkillOffer = (
+    offer: Omit<
+      SkillOffer,
+      'id' | 'userId'
+    >
+  ) => {
     if (!currentUser) return;
+
     const newOffer: SkillOffer = {
       ...offer,
+
       id: `offer-${Date.now()}`,
-      userId: currentUser.id,
+
+      userId:
+        currentUser.id,
     };
-    setSkillOffers((prev) => [newOffer, ...prev]);
-    showToast(`Added skill: ${offer.skillName}`);
-  };
 
-  const editSkillOffer = (id: string, offerData: Partial<SkillOffer>) => {
-    setSkillOffers((prev) =>
-      prev.map((o) => (o.id === id ? { ...o, ...offerData } : o))
+    setSkillOffers((prev) => [
+      newOffer,
+      ...prev,
+    ]);
+
+    showToast(
+      `Added skill: ${offer.skillName}`
     );
-    showToast('Skill updated!');
   };
 
-  const deleteSkillOffer = (id: string) => {
-    setSkillOffers((prev) => prev.filter((o) => o.id !== id));
-    showToast('Skill removed', 'info');
+  const editSkillOffer = (
+    id: string,
+    offerData: Partial<SkillOffer>
+  ) => {
+    setSkillOffers((prev) =>
+      prev.map((offer) =>
+        offer.id === id
+          ? {
+              ...offer,
+              ...offerData,
+            }
+          : offer
+      )
+    );
+
+    showToast(
+      'Skill updated!'
+    );
   };
 
-  const addSkillWant = (want: Omit<SkillWant, 'id' | 'userId'>) => {
+  const deleteSkillOffer = (
+    id: string
+  ) => {
+    setSkillOffers((prev) =>
+      prev.filter(
+        (offer) => offer.id !== id
+      )
+    );
+
+    showToast(
+      'Skill removed',
+      'info'
+    );
+  };
+
+  /*
+   * ---------------------------------------------------------
+   * SKILL WANTS
+   * ---------------------------------------------------------
+   */
+
+  const addSkillWant = (
+    want: Omit<
+      SkillWant,
+      'id' | 'userId'
+    >
+  ) => {
     if (!currentUser) return;
+
     const newWant: SkillWant = {
       ...want,
+
       id: `want-${Date.now()}`,
-      userId: currentUser.id,
+
+      userId:
+        currentUser.id,
     };
-    setSkillWants((prev) => [newWant, ...prev]);
-    showToast(`Added wanted skill: ${want.skillName}`);
+
+    setSkillWants((prev) => [
+      newWant,
+      ...prev,
+    ]);
+
+    showToast(
+      `Added wanted skill: ${want.skillName}`
+    );
   };
 
-  const deleteSkillWant = (id: string) => {
-    setSkillWants((prev) => prev.filter((w) => w.id !== id));
-    showToast('Wanted skill removed', 'info');
+  const deleteSkillWant = (
+    id: string
+  ) => {
+    setSkillWants((prev) =>
+      prev.filter(
+        (want) => want.id !== id
+      )
+    );
+
+    showToast(
+      'Wanted skill removed',
+      'info'
+    );
   };
 
-  const sendExchangeRequest = (reqData: {
-    receiverId: string;
-    skillOfferedId: string;
-    skillRequestedId: string;
-    message: string;
-    preferredSchedule: string;
-  }) => {
+  /*
+   * ---------------------------------------------------------
+   * EXCHANGE REQUEST
+   * ---------------------------------------------------------
+   */
+
+  const sendExchangeRequest = (
+    reqData: {
+      receiverId: string;
+      skillOfferedId: string;
+      skillRequestedId: string;
+      message: string;
+      preferredSchedule: string;
+    }
+  ) => {
     if (!currentUser) return;
+
+    const now =
+      new Date().toISOString();
 
     const newReq: ExchangeRequest = {
       id: `req-${Date.now()}`,
-      senderId: currentUser.id,
-      receiverId: reqData.receiverId,
-      skillOfferedId: reqData.skillOfferedId,
-      skillRequestedId: reqData.skillRequestedId,
-      message: reqData.message,
-      preferredSchedule: reqData.preferredSchedule,
+
+      senderId:
+        currentUser.id,
+
+      receiverId:
+        reqData.receiverId,
+
+      skillOfferedId:
+        reqData.skillOfferedId,
+
+      skillRequestedId:
+        reqData.skillRequestedId,
+
+      message:
+        reqData.message,
+
+      preferredSchedule:
+        reqData.preferredSchedule,
+
       status: 'pending',
-      createdAt: new Date().toISOString(),
+
+      createdAt: now,
     };
 
-    setRequests((prev) => [newReq, ...prev]);
+    setRequests((prev) => [
+      newReq,
+      ...prev,
+    ]);
 
-    // Create Notification for receiver
-    const receiver = users.find((u) => u.id === reqData.receiverId);
     const newNotif: NotificationItem = {
       id: `notif-${Date.now()}`,
-      userId: reqData.receiverId,
+
+      userId:
+        reqData.receiverId,
+
       type: 'request',
-      title: 'New Exchange Request! ⚡',
-      message: `${currentUser.name} requested a skill exchange with you.`,
-      relatedId: newReq.id,
+
+      title:
+        'New Exchange Request! ⚡',
+
+      message:
+        `${currentUser.name} requested a skill exchange with you.`,
+
+      relatedId:
+        newReq.id,
+
       isRead: false,
-      timestamp: new Date().toISOString(),
+
+      timestamp: now,
     };
 
-    setNotifications((prev) => [newNotif, ...prev]);
-    showToast('Exchange request sent! 🚀');
-    navigate('EXCHANGE_REQUESTS', { tab: 'sent' });
+    setNotifications((prev) => [
+      newNotif,
+      ...prev,
+    ]);
+
+    showToast(
+      'Exchange request sent! 🚀'
+    );
+
+    navigate(
+      'EXCHANGE_REQUESTS',
+      {
+        tab: 'sent',
+      }
+    );
   };
 
-  const acceptExchangeRequest = (requestId: string) => {
-    const req = requests.find((r) => r.id === requestId);
+  /*
+   * ---------------------------------------------------------
+   * ACCEPT REQUEST
+   * ---------------------------------------------------------
+   */
+
+  const acceptExchangeRequest = (
+    requestId: string
+  ) => {
+    const req =
+      requests.find(
+        (r) =>
+          r.id === requestId
+      );
+
     if (!req) return;
 
-    // Update request status
     setRequests((prev) =>
-      prev.map((r) => (r.id === requestId ? { ...r, status: 'accepted' } : r))
+      prev.map((r) =>
+        r.id === requestId
+          ? {
+              ...r,
+              status: 'accepted',
+            }
+          : r
+      )
     );
 
-    // Create Active Exchange
+    const exchangeId =
+      `ex-${Date.now()}`;
+
     const newExchange: Exchange = {
-      id: `ex-${Date.now()}`,
-      requestId: req.id,
-      student1Id: req.senderId,
-      student2Id: req.receiverId,
-      skill1Id: req.skillOfferedId,
-      skill2Id: req.skillRequestedId,
+      id: exchangeId,
+
+      requestId:
+        req.id,
+
+      student1Id:
+        req.senderId,
+
+      student2Id:
+        req.receiverId,
+
+      skill1Id:
+        req.skillOfferedId,
+
+      skill2Id:
+        req.skillRequestedId,
+
       status: 'active',
+
       progress: 0,
+
       completedSessions: 0,
+
       totalSessions: 5,
-      startDate: new Date().toISOString().split('T')[0],
+
+      startDate:
+        new Date()
+          .toISOString()
+          .split('T')[0],
     };
 
-    setExchanges((prev) => [newExchange, ...prev]);
+    setExchanges((prev) => [
+      newExchange,
+      ...prev,
+    ]);
 
-    // Create initial Sessions
+    const baseDate =
+      new Date();
+
+    const createSession =
+      (
+        number: number,
+        daysFromNow: number,
+        title: string
+      ): Session => ({
+        id:
+          `sess-${Date.now()}-${number}`,
+
+        exchangeId,
+
+        title,
+
+        date:
+          new Date(
+            baseDate.getTime() +
+              86400000 *
+                daysFromNow
+          )
+            .toISOString()
+            .split('T')[0],
+
+        time: '05:00 PM',
+
+        isCompleted: false,
+      });
+
     const newSessions: Session[] = [
-      {
-        id: `sess-${Date.now()}-1`,
-        exchangeId: newExchange.id,
-        title: 'Session 1: Introductory Skill Overview & Goal Setting',
-        date: new Date().toISOString().split('T')[0],
-        time: '05:00 PM',
-        isCompleted: false,
-        notes: 'Align learning objectives and prerequisites.',
-      },
-      {
-        id: `sess-${Date.now()}-2`,
-        exchangeId: newExchange.id,
-        title: 'Session 2: Hands-on Fundamentals & Practice Exercises',
-        date: new Date(Date.now() + 86400000 * 2).toISOString().split('T')[0],
-        time: '05:00 PM',
-        isCompleted: false,
-      },
-      {
-        id: `sess-${Date.now()}-3`,
-        exchangeId: newExchange.id,
-        title: 'Session 3: Core Deep Dive & Practical Project',
-        date: new Date(Date.now() + 86400000 * 5).toISOString().split('T')[0],
-        time: '05:00 PM',
-        isCompleted: false,
-      },
-      {
-        id: `sess-${Date.now()}-4`,
-        exchangeId: newExchange.id,
-        title: 'Session 4: Advanced Concepts & Troubleshooting',
-        date: new Date(Date.now() + 86400000 * 7).toISOString().split('T')[0],
-        time: '05:00 PM',
-        isCompleted: false,
-      },
-      {
-        id: `sess-${Date.now()}-5`,
-        exchangeId: newExchange.id,
-        title: 'Session 5: Final Review, Showcase & Exchange Feedback',
-        date: new Date(Date.now() + 86400000 * 10).toISOString().split('T')[0],
-        time: '05:00 PM',
-        isCompleted: false,
-      },
+      createSession(
+        1,
+        0,
+        'Session 1: Introductory Skill Overview & Goal Setting'
+      ),
+
+      createSession(
+        2,
+        2,
+        'Session 2: Hands-on Fundamentals & Practice Exercises'
+      ),
+
+      createSession(
+        3,
+        5,
+        'Session 3: Core Deep Dive & Practical Project'
+      ),
+
+      createSession(
+        4,
+        7,
+        'Session 4: Advanced Concepts & Troubleshooting'
+      ),
+
+      createSession(
+        5,
+        10,
+        'Session 5: Final Review, Showcase & Exchange Feedback'
+      ),
     ];
 
-    setSessions((prev) => [...newSessions, ...prev]);
+    setSessions((prev) => [
+      ...newSessions,
+      ...prev,
+    ]);
 
-    // Notify sender
     const newNotif: NotificationItem = {
-      id: `notif-${Date.now()}`,
-      userId: req.senderId,
+      id:
+        `notif-${Date.now()}`,
+
+      userId:
+        req.senderId,
+
       type: 'accepted',
-      title: 'Request Accepted! 🎉',
-      message: `Your exchange request was accepted! You can now start learning.`,
-      relatedId: newExchange.id,
+
+      title:
+        'Request Accepted! 🎉',
+
+      message:
+        'Your exchange request was accepted! You can now start learning.',
+
+      relatedId:
+        exchangeId,
+
       isRead: false,
-      timestamp: new Date().toISOString(),
+
+      timestamp:
+        new Date().toISOString(),
     };
-    setNotifications((prev) => [newNotif, ...prev]);
 
-    showToast('Request accepted! Active exchange created.');
-    navigate('MATCHED_EXCHANGE', { exchangeId: newExchange.id });
-  };
+    setNotifications((prev) => [
+      newNotif,
+      ...prev,
+    ]);
 
-  const rejectExchangeRequest = (requestId: string) => {
-    setRequests((prev) =>
-      prev.map((r) => (r.id === requestId ? { ...r, status: 'rejected' } : r))
+    showToast(
+      'Request accepted! Active exchange created.'
     );
-    showToast('Request declined', 'info');
-  };
 
-  const cancelExchangeRequest = (requestId: string) => {
-    setRequests((prev) =>
-      prev.map((r) => (r.id === requestId ? { ...r, status: 'cancelled' } : r))
+    navigate(
+      'MATCHED_EXCHANGE',
+      {
+        exchangeId,
+      }
     );
-    showToast('Request cancelled', 'info');
   };
 
-  const sendMessage = (exchangeId: string, text: string) => {
+  /*
+   * ---------------------------------------------------------
+   * REJECT REQUEST
+   * ---------------------------------------------------------
+   */
+
+  const rejectExchangeRequest = (
+    requestId: string
+  ) => {
+    setRequests((prev) =>
+      prev.map((request) =>
+        request.id === requestId
+          ? {
+              ...request,
+              status: 'rejected',
+            }
+          : request
+      )
+    );
+
+    showToast(
+      'Request declined',
+      'info'
+    );
+  };
+
+  /*
+   * ---------------------------------------------------------
+   * CANCEL REQUEST
+   * ---------------------------------------------------------
+   */
+
+  const cancelExchangeRequest = (
+    requestId: string
+  ) => {
+    setRequests((prev) =>
+      prev.map((request) =>
+        request.id === requestId
+          ? {
+              ...request,
+              status: 'cancelled',
+            }
+          : request
+      )
+    );
+
+    showToast(
+      'Request cancelled',
+      'info'
+    );
+  };
+
+  /*
+   * ---------------------------------------------------------
+   * MESSAGES
+   * ---------------------------------------------------------
+   */
+
+  const sendMessage = (
+    exchangeId: string,
+    text: string
+  ) => {
     if (!currentUser) return;
-    const ex = exchanges.find((e) => e.id === exchangeId);
-    if (!ex) return;
 
-    const recipientId = ex.student1Id === currentUser.id ? ex.student2Id : ex.student1Id;
+    const exchange =
+      exchanges.find(
+        (item) =>
+          item.id === exchangeId
+      );
+
+    if (!exchange) return;
+
+    const recipientId =
+      exchange.student1Id ===
+      currentUser.id
+        ? exchange.student2Id
+        : exchange.student1Id;
+
+    const now =
+      new Date().toISOString();
 
     const newMsg: Message = {
-      id: `msg-${Date.now()}`,
+      id:
+        `msg-${Date.now()}`,
+
       exchangeId,
-      senderId: currentUser.id,
-      receiverId: recipientId,
+
+      senderId:
+        currentUser.id,
+
+      receiverId:
+        recipientId,
+
       text,
-      timestamp: new Date().toISOString(),
+
+      timestamp: now,
+
       isRead: false,
     };
 
-    setMessages((prev) => [...prev, newMsg]);
+    setMessages((prev) => [
+      ...prev,
+      newMsg,
+    ]);
 
-    // Notify receiver
     const newNotif: NotificationItem = {
-      id: `notif-${Date.now()}`,
-      userId: recipientId,
+      id:
+        `notif-${Date.now()}`,
+
+      userId:
+        recipientId,
+
       type: 'message',
-      title: `Message from ${currentUser.name} 💬`,
-      message: text.length > 40 ? `${text.substring(0, 40)}...` : text,
-      relatedId: exchangeId,
+
+      title:
+        `Message from ${currentUser.name} 💬`,
+
+      message:
+        text.length > 40
+          ? `${text.substring(
+              0,
+              40
+            )}...`
+          : text,
+
+      relatedId:
+        exchangeId,
+
       isRead: false,
-      timestamp: new Date().toISOString(),
+
+      timestamp: now,
     };
-    setNotifications((prev) => [newNotif, ...prev]);
+
+    setNotifications((prev) => [
+      newNotif,
+      ...prev,
+    ]);
   };
 
-  const markSessionCompleted = (sessionId: string) => {
-    const targetSession = sessions.find((s) => s.id === sessionId);
+  /*
+   * ---------------------------------------------------------
+   * SESSION
+   * ---------------------------------------------------------
+   */
+
+  const markSessionCompleted = (
+    sessionId: string
+  ) => {
+    const targetSession =
+      sessions.find(
+        (session) =>
+          session.id === sessionId
+      );
+
     if (!targetSession) return;
 
-    const updatedSessions = sessions.map((s) =>
-      s.id === sessionId ? { ...s, isCompleted: !s.isCompleted } : s
-    );
-    setSessions(updatedSessions);
+    const updatedSessions =
+      sessions.map((session) =>
+        session.id === sessionId
+          ? {
+              ...session,
+              isCompleted:
+                !session.isCompleted,
+            }
+          : session
+      );
 
-    // Update parent exchange progress
-    const exchangeId = targetSession.exchangeId;
-    const exSessions = updatedSessions.filter((s) => s.exchangeId === exchangeId);
-    const completedCount = exSessions.filter((s) => s.isCompleted).length;
-    const totalCount = exSessions.length || 1;
-    const progressPercent = Math.round((completedCount / totalCount) * 100);
+    setSessions(
+      updatedSessions
+    );
+
+    const exchangeId =
+      targetSession.exchangeId;
+
+    const exchangeSessions =
+      updatedSessions.filter(
+        (session) =>
+          session.exchangeId ===
+          exchangeId
+      );
+
+    const completedCount =
+      exchangeSessions.filter(
+        (session) =>
+          session.isCompleted
+      ).length;
+
+    const totalCount =
+      exchangeSessions.length || 1;
+
+    const progress =
+      Math.round(
+        (completedCount /
+          totalCount) *
+          100
+      );
 
     setExchanges((prev) =>
-      prev.map((e) =>
-        e.id === exchangeId
+      prev.map((exchange) =>
+        exchange.id === exchangeId
           ? {
-              ...e,
-              progress: progressPercent,
-              completedSessions: completedCount,
-              status: progressPercent === 100 ? 'completed' : 'active',
-              completedAt: progressPercent === 100 ? new Date().toISOString() : undefined,
+              ...exchange,
+
+              progress,
+
+              completedSessions:
+                completedCount,
+
+              status:
+                progress === 100
+                  ? 'completed'
+                  : 'active',
+
+              completedAt:
+                progress === 100
+                  ? new Date().toISOString()
+                  : undefined,
             }
-          : e
+          : exchange
       )
     );
 
@@ -500,148 +1669,380 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     );
   };
 
-  const endExchange = (exchangeId: string) => {
+  /*
+   * ---------------------------------------------------------
+   * END EXCHANGE
+   * ---------------------------------------------------------
+   */
+
+  const endExchange = (
+    exchangeId: string
+  ) => {
     setExchanges((prev) =>
-      prev.map((e) => (e.id === exchangeId ? { ...e, status: 'completed', progress: 100 } : e))
+      prev.map((exchange) =>
+        exchange.id === exchangeId
+          ? {
+              ...exchange,
+              status: 'completed',
+              progress: 100,
+            }
+          : exchange
+      )
     );
-    showToast('Exchange marked as completed! 🏆');
-    navigate('RATINGS_REVIEWS', { exchangeId });
+
+    showToast(
+      'Exchange marked as completed! 🏆'
+    );
+
+    navigate(
+      'RATINGS_REVIEWS',
+      {
+        exchangeId,
+      }
+    );
   };
 
-  const submitReview = (reviewData: {
-    exchangeId: string;
-    revieweeId: string;
-    rating: number;
-    comment: string;
-  }) => {
+  /*
+   * ---------------------------------------------------------
+   * REVIEWS
+   * ---------------------------------------------------------
+   */
+
+  const submitReview = (
+    reviewData: {
+      exchangeId: string;
+      revieweeId: string;
+      rating: number;
+      comment: string;
+    }
+  ) => {
     if (!currentUser) return;
 
-    const newRev: Review = {
-      id: `rev-${Date.now()}`,
-      exchangeId: reviewData.exchangeId,
-      reviewerId: currentUser.id,
-      revieweeId: reviewData.revieweeId,
-      rating: reviewData.rating,
-      comment: reviewData.comment,
-      timestamp: new Date().toISOString(),
+    const newReview: Review = {
+      id:
+        `rev-${Date.now()}`,
+
+      exchangeId:
+        reviewData.exchangeId,
+
+      reviewerId:
+        currentUser.id,
+
+      revieweeId:
+        reviewData.revieweeId,
+
+      rating:
+        reviewData.rating,
+
+      comment:
+        reviewData.comment,
+
+      timestamp:
+        new Date().toISOString(),
     };
 
-    const updatedReviews = [newRev, ...reviews];
-    setReviews(updatedReviews);
+    const updatedReviews = [
+      newReview,
+      ...reviews,
+    ];
 
-    // Update reviewee rating & review count & completed exchanges
+    setReviews(
+      updatedReviews
+    );
+
     setUsers((prev) =>
-      prev.map((u) => {
-        if (u.id === reviewData.revieweeId) {
-          const uReviews = updatedReviews.filter((r) => r.revieweeId === u.id);
-          const avgRating = Number(
-            (uReviews.reduce((acc, r) => acc + r.rating, 0) / uReviews.length).toFixed(1)
-          );
-          return {
-            ...u,
-            rating: avgRating,
-            reviewCount: uReviews.length,
-            completedExchanges: u.completedExchanges + 1,
-          };
+      prev.map((user) => {
+        if (
+          user.id !==
+          reviewData.revieweeId
+        ) {
+          return user;
         }
-        return u;
+
+        const userReviews =
+          updatedReviews.filter(
+            (review) =>
+              review.revieweeId ===
+              user.id
+          );
+
+        const average =
+          userReviews.length
+            ? Number(
+                (
+                  userReviews.reduce(
+                    (
+                      total,
+                      review
+                    ) =>
+                      total +
+                      review.rating,
+                    0
+                  ) /
+                  userReviews.length
+                ).toFixed(1)
+              )
+            : 5;
+
+        return {
+          ...user,
+
+          rating: average,
+
+          reviewCount:
+            userReviews.length,
+
+          completedExchanges:
+            user.completedExchanges +
+            1,
+        };
       })
     );
 
-    showToast('Thank you for your rating & review! ⭐');
-    navigate('MY_EXCHANGES', { tab: 'completed' });
-  };
+    showToast(
+      'Thank you for your rating & review! ⭐'
+    );
 
-  const markNotificationRead = (id: string) => {
-    setNotifications((prev) =>
-      prev.map((n) => (n.id === id ? { ...n, isRead: true } : n))
+    navigate(
+      'MY_EXCHANGES',
+      {
+        tab: 'completed',
+      }
     );
   };
 
-  const markAllNotificationsRead = () => {
-    if (!currentUser) return;
+  /*
+   * ---------------------------------------------------------
+   * NOTIFICATIONS
+   * ---------------------------------------------------------
+   */
+
+  const markNotificationRead = (
+    id: string
+  ) => {
     setNotifications((prev) =>
-      prev.map((n) => (n.userId === currentUser.id ? { ...n, isRead: true } : n))
+      prev.map((notification) =>
+        notification.id === id
+          ? {
+              ...notification,
+              isRead: true,
+            }
+          : notification
+      )
     );
-    showToast('All notifications marked as read', 'info');
   };
 
-  const updateFilters = (newFilters: Partial<FilterState>) => {
-    setFilters((prev) => ({ ...prev, ...newFilters }));
+  const markAllNotificationsRead =
+    () => {
+      if (!currentUser) return;
+
+      setNotifications((prev) =>
+        prev.map((notification) =>
+          notification.userId ===
+          currentUser.id
+            ? {
+                ...notification,
+                isRead: true,
+              }
+            : notification
+        )
+      );
+
+      showToast(
+        'All notifications marked as read',
+        'info'
+      );
+    };
+
+  /*
+   * ---------------------------------------------------------
+   * FILTERS
+   * ---------------------------------------------------------
+   */
+
+  const updateFilters = (
+    newFilters: Partial<FilterState>
+  ) => {
+    setFilters((prev) => ({
+      ...prev,
+      ...newFilters,
+    }));
   };
 
   const resetFilters = () => {
-    setFilters(DEFAULT_FILTERS);
+    setFilters(
+      DEFAULT_FILTERS
+    );
   };
+
+  /*
+   * ---------------------------------------------------------
+   * MOBILE FRAME
+   * ---------------------------------------------------------
+   */
 
   const toggleMobileFrame = () => {
-    setMobileFrameMode((prev) => !prev);
+    setMobileFrameMode(
+      (previous) => !previous
+    );
   };
 
+  /*
+   * ---------------------------------------------------------
+   * RESET DEMO STATE
+   * ---------------------------------------------------------
+   */
+
   const resetToDemoState = () => {
-    localStorage.removeItem(LOCAL_STORAGE_KEY);
+    localStorage.removeItem(
+      LOCAL_STORAGE_KEY
+    );
+
     setUsers(initialUsers);
-    setCurrentUser(initialUsers[0]);
-    setSkillOffers(initialSkillOffers);
-    setSkillWants(initialSkillWants);
-    setRequests(initialRequests);
-    setExchanges(initialExchanges);
-    setMessages(initialMessages);
-    setNotifications(initialNotifications);
-    setReviews(initialReviews);
-    setSessions(initialSessions);
-    setOnboardingCompleted(true);
-    showToast('Reset to demo sample data!', 'info');
+
+    setCurrentUser(
+      initialUsers[0]
+    );
+
+    setSkillOffers(
+      initialSkillOffers
+    );
+
+    setSkillWants(
+      initialSkillWants
+    );
+
+    setRequests(
+      initialRequests
+    );
+
+    setExchanges(
+      initialExchanges
+    );
+
+    setMessages(
+      initialMessages
+    );
+
+    setNotifications(
+      initialNotifications
+    );
+
+    setReviews(
+      initialReviews
+    );
+
+    setSessions(
+      initialSessions
+    );
+
+    setOnboardingCompleted(
+      true
+    );
+
+    showToast(
+      'Reset to demo sample data!',
+      'info'
+    );
+
     navigate('HOME');
   };
+
+  /*
+   * ---------------------------------------------------------
+   * PROVIDER
+   * ---------------------------------------------------------
+   */
 
   return (
     <AppContext.Provider
       value={{
         currentUser,
+
         users,
+
         skillOffers,
+
         skillWants,
+
         requests,
+
         exchanges,
+
         messages,
+
         notifications,
+
         reviews,
+
         sessions,
+
         currentScreen,
+
         screenParams,
+
         historyStack,
+
         filters,
+
         onboardingCompleted,
+
         mobileFrameMode,
+
         toastMessage,
 
         navigate,
+
         goBack,
+
         showToast,
+
         login,
+
         signup,
+
         logout,
+
         completeOnboarding,
+
         updateProfile,
+
         addSkillOffer,
+
         editSkillOffer,
+
         deleteSkillOffer,
+
         addSkillWant,
+
         deleteSkillWant,
+
         sendExchangeRequest,
+
         acceptExchangeRequest,
+
         rejectExchangeRequest,
+
         cancelExchangeRequest,
+
         sendMessage,
+
         markSessionCompleted,
+
         endExchange,
+
         submitReview,
+
         markNotificationRead,
+
         markAllNotificationsRead,
+
         updateFilters,
+
         resetFilters,
+
         toggleMobileFrame,
+
         resetToDemoState,
       }}
     >
@@ -650,10 +2051,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   );
 };
 
+/*
+ * ---------------------------------------------------------
+ * useApp HOOK
+ * ---------------------------------------------------------
+ */
+
 export const useApp = () => {
-  const context = useContext(AppContext);
+  const context =
+    useContext(AppContext);
+
   if (!context) {
-    throw new Error('useApp must be used within an AppProvider');
+    throw new Error(
+      'useApp must be used within an AppProvider'
+    );
   }
+
   return context;
 };
