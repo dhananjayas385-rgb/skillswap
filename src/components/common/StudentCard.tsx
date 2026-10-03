@@ -69,7 +69,7 @@ export const StudentCard: React.FC<StudentCardProps> = ({
       <div className="flex items-center justify-between py-1 border-y border-slate-800/80 text-xs">
         <div className="flex items-center gap-1 text-amber-400 font-semibold">
           <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
-          <span>{student.rating.toFixed(1)}</span>
+          <span>{Number(student.rating ?? 0).toFixed(1)} ⭐</span>
           <span className="text-slate-500 font-normal">({student.reviewCount} reviews)</span>
         </div>
         <div className="text-slate-400 text-xs font-medium">

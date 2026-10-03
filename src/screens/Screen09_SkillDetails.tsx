@@ -91,7 +91,7 @@ export const Screen09_SkillDetails: React.FC = () => {
             </div>
             <div className="flex items-center gap-1 text-amber-400 text-xs font-bold bg-amber-950/60 px-2.5 py-1 rounded-xl border border-amber-800/60">
               <Star className="w-3.5 h-3.5 fill-amber-400" />
-              <span>{teacher.rating.toFixed(1)}</span>
+              <span>{Number(teacher.rating ?? 0).toFixed(1)}</span>
             </div>
           </div>
 

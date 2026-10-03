@@ -66,7 +66,7 @@ export const Screen20_Profile: React.FC = () => {
           <div className="flex flex-col items-center">
             <div className="flex items-center gap-1 text-amber-400 font-bold text-sm">
               <Star className="w-4 h-4 fill-amber-400" />
-              <span>{currentUser.rating.toFixed(1)}</span>
+              <span>{Number(currentUser.rating ?? 0).toFixed(1)}</span>
             </div>
             <span className="text-[10px] text-slate-400">Rating</span>
           </div>

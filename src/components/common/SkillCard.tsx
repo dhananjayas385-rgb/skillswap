@@ -59,7 +59,7 @@ export const SkillCard: React.FC<SkillCardProps> = ({
           </div>
           <div className="flex items-center gap-1 text-amber-400 text-xs font-semibold">
             <Star className="w-3.5 h-3.5 fill-amber-400" />
-            <span>{teacher.rating.toFixed(1)}</span>
+            <span>{Number(teacher.rating ?? 0).toFixed(1)}</span>
           </div>
         </div>
       )}
