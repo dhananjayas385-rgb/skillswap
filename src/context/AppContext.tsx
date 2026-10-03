@@ -1794,7 +1794,7 @@ useEffect(() => {
               user.id
           );
 
-        const averageRating =
+        const average =
   userReviews.length > 0
     ? Number(
         (
@@ -1809,7 +1809,7 @@ useEffect(() => {
         return {
           ...user,
 
-          rating: averageRating,
+          rating: average,
 
           reviewCount:
             userReviews.length,
