@@ -1794,28 +1794,22 @@ useEffect(() => {
               user.id
           );
 
-        const average =
-          userReviews.length
-            ? Number(
-                (
-                  userReviews.reduce(
-                    (
-                      total,
-                      review
-                    ) =>
-                      total +
-                      review.rating,
-                    0
-                  ) /
-                  userReviews.length
-                ).toFixed(1)
-              )
-            : 5;
+        const averageRating =
+  userReviews.length > 0
+    ? Number(
+        (
+          userReviews.reduce(
+            (total, review) => total + Number(review?.rating ?? 0),
+            0
+          ) / userReviews.length
+        ).toFixed(1)
+      )
+    : 5;
 
         return {
           ...user,
 
-          rating: average,
+          rating: averageRating,
 
           reviewCount:
             userReviews.length,
