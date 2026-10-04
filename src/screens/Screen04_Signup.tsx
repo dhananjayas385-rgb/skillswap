@@ -479,72 +479,207 @@ export const Screen04_Signup: React.FC = () => {
         </div>
 
         {/* DEPARTMENT + SEMESTER */}
-        <div className="grid grid-cols-2 gap-2">
+        {/* DEPARTMENT + SEMESTER */}
+<div className="grid grid-cols-2 gap-2">
 
-          <div className="flex flex-col gap-1.5">
+  {/* DEPARTMENT */}
+  <div className="flex flex-col gap-1.5">
 
-            <label className="text-xs font-semibold text-slate-300 uppercase tracking-wide">
-              Department
-            </label>
+    <label className="text-xs font-semibold text-slate-300 uppercase tracking-wide">
+      Department
+    </label>
 
-            <select
-              className="w-full bg-slate-900 border border-slate-700 text-slate-100 rounded-xl px-3 py-3 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
-              value={formData.department}
-              onChange={(e) =>
-                setFormData({
-                  ...formData,
-                  department: e.target.value,
-                })
-              }
-            >
-              <option value="Computer Science & Eng">
-                Computer Science
-              </option>
+    <select
+      className="w-full bg-slate-900 border border-slate-700 text-slate-100 rounded-xl px-3 py-3 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+      value={formData.department}
+      onChange={(e) =>
+        setFormData({
+          ...formData,
+          department: e.target.value,
+        })
+      }
+    >
+      <option value="Computer Science & Engineering">
+        Computer Science & Engineering
+      </option>
 
-              <option value="Information Science">
-                Information Science
-              </option>
+      <option value="Information Science & Engineering">
+        Information Science & Engineering
+      </option>
 
-              <option value="Electronics & Comm">
-                Electronics & Comm
-              </option>
+      <option value="Artificial Intelligence & Machine Learning">
+        Artificial Intelligence & Machine Learning
+      </option>
 
-              <option value="Mechanical Eng">
-                Mechanical Eng
-              </option>
+      <option value="Artificial Intelligence & Data Science">
+        Artificial Intelligence & Data Science
+      </option>
 
-              <option value="Business Admin">
-                Business Admin
-              </option>
-            </select>
+      <option value="Data Science">
+        Data Science
+      </option>
 
-          </div>
+      <option value="Cyber Security">
+        Cyber Security
+      </option>
 
-          <div className="flex flex-col gap-1.5">
+      <option value="Computer Engineering">
+        Computer Engineering
+      </option>
 
-            <label className="text-xs font-semibold text-slate-300 uppercase tracking-wide">
-              Semester
-            </label>
+      <option value="Information Technology">
+        Information Technology
+      </option>
 
-            <select
-              className="w-full bg-slate-900 border border-slate-700 text-slate-100 rounded-xl px-3 py-3 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
-              value={formData.semester}
-              onChange={(e) =>
-                setFormData({
-                  ...formData,
-                  semester: e.target.value,
-                })
-              }
-            >
-              <option value="1st Sem">1st Sem</option>
-              <option value="3rd Sem">3rd Sem</option>
-              <option value="5th Sem">5th Sem</option>
-              <option value="7th Sem">7th Sem</option>
-            </select>
+      <option value="Electronics & Communication Engineering">
+        Electronics & Communication Engineering
+      </option>
 
-          </div>
+      <option value="Electronics & Telecommunication Engineering">
+        Electronics & Telecommunication Engineering
+      </option>
 
-        </div>
+      <option value="Electrical & Electronics Engineering">
+        Electrical & Electronics Engineering
+      </option>
+
+      <option value="Electronics & Instrumentation Engineering">
+        Electronics & Instrumentation Engineering
+      </option>
+
+      <option value="Electrical Engineering">
+        Electrical Engineering
+      </option>
+
+      <option value="Mechanical Engineering">
+        Mechanical Engineering
+      </option>
+
+      <option value="Civil Engineering">
+        Civil Engineering
+      </option>
+
+      <option value="Chemical Engineering">
+        Chemical Engineering
+      </option>
+
+      <option value="Biotechnology">
+        Biotechnology
+      </option>
+
+      <option value="Biomedical Engineering">
+        Biomedical Engineering
+      </option>
+
+      <option value="Aerospace Engineering">
+        Aerospace Engineering
+      </option>
+
+      <option value="Aeronautical Engineering">
+        Aeronautical Engineering
+      </option>
+
+      <option value="Automobile Engineering">
+        Automobile Engineering
+      </option>
+
+      <option value="Industrial Engineering">
+        Industrial Engineering
+      </option>
+
+      <option value="Industrial & Production Engineering">
+        Industrial & Production Engineering
+      </option>
+
+      <option value="Robotics & Automation">
+        Robotics & Automation
+      </option>
+
+      <option value="Mechatronics Engineering">
+        Mechatronics Engineering
+      </option>
+
+      <option value="Artificial Intelligence">
+        Artificial Intelligence
+      </option>
+
+      <option value="Machine Learning">
+        Machine Learning
+      </option>
+
+      <option value="Construction Technology">
+        Construction Technology
+      </option>
+
+      <option value="Environmental Engineering">
+        Environmental Engineering
+      </option>
+
+      <option value="Food Technology">
+        Food Technology
+      </option>
+
+      <option value="Textile Engineering">
+        Textile Engineering
+      </option>
+
+      <option value="Agricultural Engineering">
+        Agricultural Engineering
+      </option>
+
+      <option value="Mining Engineering">
+        Mining Engineering
+      </option>
+
+      <option value="Petroleum Engineering">
+        Petroleum Engineering
+      </option>
+
+      <option value="Printing Technology">
+        Printing Technology
+      </option>
+
+      <option value="Telecommunication Engineering">
+        Telecommunication Engineering
+      </option>
+
+      <option value="Other">
+        Other
+      </option>
+    </select>
+
+  </div>
+
+  {/* SEMESTER */}
+  <div className="flex flex-col gap-1.5">
+
+    <label className="text-xs font-semibold text-slate-300 uppercase tracking-wide">
+      Semester
+    </label>
+
+    <select
+      className="w-full bg-slate-900 border border-slate-700 text-slate-100 rounded-xl px-3 py-3 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+      value={formData.semester}
+      onChange={(e) =>
+        setFormData({
+          ...formData,
+          semester: e.target.value,
+        })
+      }
+    >
+      <option value="1st Sem">1st Semester</option>
+      <option value="2nd Sem">2nd Semester</option>
+      <option value="3rd Sem">3rd Semester</option>
+      <option value="4th Sem">4th Semester</option>
+      <option value="5th Sem">5th Semester</option>
+      <option value="6th Sem">6th Semester</option>
+      <option value="7th Sem">7th Semester</option>
+      <option value="8th Sem">8th Semester</option>
+    </select>
+
+  </div>
+
+</div>
 
         {/* AGREEMENT */}
         <label className="flex items-center gap-2 text-xs text-slate-300 mt-1 cursor-pointer">
