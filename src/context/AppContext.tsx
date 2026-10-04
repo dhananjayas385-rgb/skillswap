@@ -1208,27 +1208,106 @@ useEffect(() => {
    * ---------------------------------------------------------
    */
 
-  const sendExchangeRequest = (
-    reqData: {
-      receiverId: string;
-      skillOfferedId: string;
-      skillRequestedId: string;
-      message: string;
-      preferredSchedule: string;
+  const sendExchangeRequest = async (
+  reqData: {
+    receiverId: string;
+    skillOfferedId: string;
+    skillRequestedId: string;
+    message: string;
+    preferredSchedule: string;
+  }
+) => {
+  if (!currentUser) return;
+
+  try {
+    /*
+     * Find the frontend skill records.
+     * We send their names as a fallback because
+     * frontend skill IDs and Supabase skill IDs
+     * may be different.
+     */
+    const offeredSkill = skillOffers.find(
+      (skill) =>
+        String(skill.id) ===
+        String(reqData.skillOfferedId)
+    );
+
+    const requestedSkill = skillOffers.find(
+      (skill) =>
+        String(skill.id) ===
+        String(reqData.skillRequestedId)
+    );
+
+    if (!offeredSkill) {
+      showToast(
+        'Your teaching skill could not be found.',
+        'error'
+      );
+      return;
     }
-  ) => {
-    if (!currentUser) return;
+
+    if (!requestedSkill) {
+      showToast(
+        'The requested learning skill could not be found.',
+        'error'
+      );
+      return;
+    }
+
+    /*
+     * Send to the real backend.
+     */
+    const backendResponse = await apiRequest(
+      '/exchange-requests/',
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          receiver_id:
+            reqData.receiverId,
+
+          offered_skill_id:
+            reqData.skillOfferedId,
+
+          requested_skill_id:
+            reqData.skillRequestedId,
+
+          offered_skill_name:
+            offeredSkill.skillName,
+
+          requested_skill_name:
+            requestedSkill.skillName,
+
+          message:
+            `${reqData.message}\nPreferred schedule: ${reqData.preferredSchedule}`,
+        }),
+      }
+    );
+
+    const backendRequest =
+      backendResponse?.request;
+
+    if (!backendRequest) {
+      throw new Error(
+        'The server did not return the exchange request.'
+      );
+    }
 
     const now =
+      backendRequest.created_at ||
       new Date().toISOString();
 
+    /*
+     * Keep the frontend state synchronized.
+     */
     const newReq: ExchangeRequest = {
-      id: `req-${Date.now()}`,
+      id: backendRequest.id,
 
       senderId:
+        backendRequest.sender_id ||
         currentUser.id,
 
       receiverId:
+        backendRequest.receiver_id ||
         reqData.receiverId,
 
       skillOfferedId:
@@ -1243,45 +1322,28 @@ useEffect(() => {
       preferredSchedule:
         reqData.preferredSchedule,
 
-      status: 'pending',
+      status:
+        backendRequest.status ||
+        'pending',
 
-      createdAt: now,
+      createdAt:
+        now,
     };
 
-    setRequests((prev) => [
-      newReq,
-      ...prev,
-    ]);
+    setRequests((prev) => {
+      const filtered = prev.filter(
+        (request) =>
+          request.id !== newReq.id
+      );
 
-    const newNotif: NotificationItem = {
-      id: `notif-${Date.now()}`,
-
-      userId:
-        reqData.receiverId,
-
-      type: 'request',
-
-      title:
-        'New Exchange Request! ⚡',
-
-      message:
-        `${currentUser.name} requested a skill exchange with you.`,
-
-      relatedId:
-        newReq.id,
-
-      isRead: false,
-
-      timestamp: now,
-    };
-
-    setNotifications((prev) => [
-      newNotif,
-      ...prev,
-    ]);
+      return [
+        newReq,
+        ...filtered,
+      ];
+    });
 
     showToast(
-      'Exchange request sent! 🚀'
+      'Exchange request sent successfully! 🚀'
     );
 
     navigate(
@@ -1290,8 +1352,21 @@ useEffect(() => {
         tab: 'sent',
       }
     );
-  };
 
+  } catch (error: any) {
+
+    console.error(
+      'Failed to send exchange request:',
+      error
+    );
+
+    showToast(
+      error?.message ||
+        'Could not send exchange request. Please try again.',
+      'error'
+    );
+  }
+};
   /*
    * ---------------------------------------------------------
    * ACCEPT REQUEST
