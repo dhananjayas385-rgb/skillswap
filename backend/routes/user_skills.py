@@ -22,7 +22,6 @@ def add_user_skill(
     data: UserSkillRequest,
     current_user=Depends(get_current_user)
 ):
-
     if data.skill_type not in ["teach", "learn"]:
         raise HTTPException(
             status_code=400,
@@ -56,7 +55,8 @@ def add_user_skill(
     if existing.data:
         return {
             "message": "Skill already added",
-            "user_skill": existing.data[0]
+            "user_skill": existing.data[0],
+            "skill": skill.data[0]
         }
 
     result = (
@@ -88,15 +88,65 @@ def add_user_skill(
 def get_my_skills(
     current_user=Depends(get_current_user)
 ):
-
     result = (
         supabase
         .table("user_skills")
-        .select("id, skill_id, skill_type, proficiency, skills(id, name, category, description)")
+        .select(
+            "id, user_id, skill_id, skill_type, proficiency, "
+            "skills(id, name, category, description)"
+        )
         .eq("user_id", current_user["id"])
         .execute()
     )
 
     return {
-        "skills": result.data
+        "skills": result.data or []
+    }
+
+
+@router.get("/user/{user_id}")
+def get_user_skills(
+    user_id: str,
+    current_user=Depends(get_current_user)
+):
+    # Confirm that the requested user exists.
+    user_result = (
+        supabase
+        .table("users")
+        .select("id")
+        .eq("id", user_id)
+        .execute()
+    )
+
+    if not user_result.data:
+        raise HTTPException(
+            status_code=404,
+            detail="User not found"
+        )
+
+    # Retrieve the requested user's teaching and learning skills.
+    result = (
+        supabase
+        .table("user_skills")
+        .select(
+            "id, user_id, skill_id, skill_type, proficiency, "
+            "skills(id, name, category, description)"
+        )
+        .eq("user_id", user_id)
+        .execute()
+    )
+
+    skills = result.data or []
+
+    return {
+        "user_id": user_id,
+        "skills": skills,
+        "teaching_skills": [
+            item for item in skills
+            if item.get("skill_type") == "teach"
+        ],
+        "learning_skills": [
+            item for item in skills
+            if item.get("skill_type") == "learn"
+        ]
     }
